@@ -19,31 +19,46 @@
   "bugs": {
     "url": "https://github.com/fdsaer/frontend-project-lvl3/issues"
   },
+  "jest": {
+    "verbose": true,
+    "testURL": "http://localhost/",
+    "testEnvironment": "jsdom"
+  },
   "homepage": "https://github.com/fdsaer/frontend-project-lvl3#readme",
   "devDependencies": {
     "@babel/core": "^7.15.5",
+    "@babel/eslint-parser": "^7.15.8",
     "@babel/preset-env": "^7.15.6",
     "@webpack-cli/generators": "^2.3.0",
     "autoprefixer": "^10.3.7",
+    "babel-jest": "^27.2.5",
     "babel-loader": "^8.2.2",
     "css-loader": "^6.3.0",
+    "debug": "^4.3.2",
     "eslint": "^7.32.0",
-    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-airbnb": "^18.2.1",
+    "eslint-plugin-babel": "^5.3.1",
     "eslint-plugin-import": "^2.24.2",
+    "eslint-plugin-jest": "^24.5.2",
+    "file-loader": "^6.2.0",
     "html-webpack-plugin": "^5.3.2",
+    "jest": "^27.2.5",
+    "jest-cli": "^27.2.5",
     "postcss": "^8.3.9",
     "postcss-loader": "^6.1.1",
     "postcss-preset-env": "^6.7.0",
     "prettier": "^2.4.1",
-    "sass": "^1.42.1",
-    "sass-loader": "^12.1.0",
     "style-loader": "^3.3.0",
+    "url-loader": "^4.1.1",
     "webpack": "^5.57.1",
     "webpack-cli": "^4.8.0",
     "webpack-dev-server": "^4.3.1",
     "workbox-webpack-plugin": "^6.3.0"
   },
   "dependencies": {
-    "bootstrap": "^5.1.2"
+    "bootstrap": "^5.1.2",
+    "npm-check-updates": "^11.8.5",
+    "sass": "^1.39.0",
+    "sass-loader": "^12.1.0"
   }
 }
