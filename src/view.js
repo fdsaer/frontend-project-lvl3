@@ -30,7 +30,7 @@ const renderPost = (item) => {
     'justify-content-between',
     'align-items-start',
     'border-0',
-    'border-end-0'
+    'border-end-0',
   );
   postLink.classList.add('fw-bold');
   postButton.classList.add('btn', 'btn-outline-primary', 'btn-sm');
@@ -63,14 +63,7 @@ const renderFeeds = (feedList, articles) => {
     section.classList.add('container-fluid', 'container-xxl', 'p-5');
     row.classList.add('row');
     col1.classList.add('col-md-10', 'col-lg-8', 'order-1', 'mx-auto', 'posts');
-    col2.classList.add(
-      'col-md-10',
-      'col-lg-4',
-      'mx-auto',
-      'order-0',
-      'order-lg-1',
-      'feeds'
-    );
+    col2.classList.add('col-md-10', 'col-lg-4', 'mx-auto', 'order-0', 'order-lg-1', 'feeds');
     card.classList.add('card', 'border-0');
     cardBody.classList.add('card-body');
     cardList.classList.add('list-group', 'border-0', 'rounded-0');

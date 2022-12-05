@@ -69,8 +69,9 @@ const axiosInstance = axios.create({
   baseURL,
 });
 
-const getFeed = (url) =>
-  axiosInstance.get(`get?url=${encodeURIComponent(url)}`).then((response) => {
+const getFeed = (url) => axiosInstance
+  .get(`get?url=${encodeURIComponent(url)}`)
+  .then((response) => {
     if (response.status === 200 && response?.data?.contents) {
       return response.data.contents;
     }
@@ -91,9 +92,7 @@ queryForm.addEventListener('submit', (evt) => {
     .then((rss) => {
       const result = rssParser(
         rss,
-        watchedState.feedList.length > 0
-          ? watchedState.feedList.map(({ id }) => id)
-          : []
+        watchedState.feedList.length > 0 ? watchedState.feedList.map(({ id }) => id) : [],
       );
       console.log({ result });
       return result;
