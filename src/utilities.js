@@ -1,4 +1,15 @@
-export const rssParser = (rss, feedIds) => {
+const generateFeedId = (rssLink, oldFeedList) => {
+  if (oldFeedList.length > 0) {
+    const indexOfFeed = oldFeedList.map(({ link }) => link).indexOf(rssLink);
+    const currentId = indexOfFeed !== -1
+      ? oldFeedList[indexOfFeed]?.id
+      : Math.max(...oldFeedList.map(({ id }) => id)) + 1;
+    return currentId;
+  }
+  return 0;
+};
+
+export const rssParser = (rss, oldFeedList) => {
   const feedObj = {
     feedList: [],
     articlesList: [],
@@ -10,7 +21,7 @@ export const rssParser = (rss, feedIds) => {
   const rssDescription = channel.querySelector('description').textContent;
   const rssLink = channel.querySelector('link').textContent;
   const articlesDomList = channel.querySelectorAll('item');
-  const currentId = feedIds.length > 0 ? Math.max(...feedIds) + 1 : 0;
+  const currentId = generateFeedId(rssLink, oldFeedList);
   const articlesArrayList = Array.prototype.slice.call(articlesDomList).map((item) => {
     const itemTitle = item.querySelector('title').textContent;
     const itemDescription = item.querySelector('description').textContent;

@@ -3,7 +3,7 @@ import { setLocale, string, ValidationError } from 'yup';
 import i18next from 'i18next';
 import axios from 'axios';
 import view from './view.js';
-import { baseURL } from './constants.js';
+import { baseURL, fetchInterval } from './constants.js';
 import { rssParser } from './utilities.js';
 
 const queryForm = document.querySelector('.rss-form');
@@ -17,6 +17,7 @@ const state = {
     validationState: 'valid',
     feedList: [],
     articles: [],
+    timer: '',
   },
 };
 
@@ -31,6 +32,7 @@ i18next.init({
         field_too_small: 'Слишком маленький (',
         not_one_of: 'Это уже было (',
         can_not_fetch: 'По этому урлу не содержится rss',
+        feed_loaded: 'RSS успешно загружен',
       },
     },
     en: {
@@ -40,6 +42,7 @@ i18next.init({
         field_too_small: 'too small !!!',
         not_one_of: 'Must not be one of',
         can_not_fetch: 'No rss by this url',
+        feed_loaded: 'RSS successefully loaded',
       },
     },
   },
@@ -78,6 +81,26 @@ const getFeed = (url) => axiosInstance
     throw new Error(i18next.t('can_not_fetch'));
   });
 
+const updateFeeds = () => {
+  const timer = setTimeout(() => {
+    Promise
+      .all(watchedState.feedList.map(({ link }) => getFeed(link)
+        .then((rss) => rssParser(
+          rss,
+          watchedState.feedList,
+        ))))
+      .then((feedObjects) => {
+        const arrs = [];
+        feedObjects.forEach(({ articlesList }) => {
+          arrs.unshift(...articlesList);
+        });
+        watchedState.articles = arrs;
+        updateFeeds();
+      });
+  }, fetchInterval);
+  return timer;
+};
+
 queryForm.addEventListener('submit', (evt) => {
   evt.preventDefault();
   watchedState.state = 'processing';
@@ -92,7 +115,7 @@ queryForm.addEventListener('submit', (evt) => {
     .then((rss) => {
       const result = rssParser(
         rss,
-        watchedState.feedList.length > 0 ? watchedState.feedList.map(({ id }) => id) : [],
+        watchedState.feedList.length > 0 ? watchedState.feedList : [],
       );
       console.log({ result });
       return result;
@@ -101,6 +124,7 @@ queryForm.addEventListener('submit', (evt) => {
       watchedState.feedList.unshift(...feedObj?.feedList);
       watchedState.articles.unshift(...feedObj?.articlesList);
       watchedState.state = 'success';
+      if (!watchedState.timer) watchedState.timer = updateFeeds();
     })
     .catch((err) => {
       let errorText = '';

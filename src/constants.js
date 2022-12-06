@@ -1,2 +1,2 @@
 export const baseURL = 'https://allorigins.hexlet.app';
-export const someVariable = 'lalala';
+export const fetchInterval = 5000;
