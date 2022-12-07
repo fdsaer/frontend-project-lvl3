@@ -2,6 +2,10 @@ import './style.scss';
 import onChange from 'on-change';
 
 const mainPart = document.querySelector('main');
+const modal = document.getElementById('modal');
+const modalTitle = modal.querySelector('.modal-title');
+const modalBody = modal.querySelector('.modal-body');
+const modalLinkButton = modal.querySelector('.modal-footer a');
 const urlInput = document.getElementById('url-input');
 const feedbackString = document.querySelector('.feedback');
 const queryForm = document.querySelector('.rss-form');
@@ -32,16 +36,20 @@ const renderPost = (item) => {
     'border-0',
     'border-end-0',
   );
-  postLink.classList.add('fw-bold');
+  if (item?.visited) {
+    postLink.classList.add('fw-normal', 'link-secondary');
+  } else {
+    postLink.classList.add('fw-bold');
+  }
   postButton.classList.add('btn', 'btn-outline-primary', 'btn-sm');
   postLink.innerHTML = item.title;
   postLink.setAttribute('href', item.link);
-  postLink.setAttribute('data-id', '2');
+  postLink.setAttribute('data-id', `${item.feedId}_${item.id}`);
   postLink.setAttribute('target', '_blank');
   postLink.setAttribute('rel', 'noopener noreferrer');
   postButton.innerHTML = 'Просмотр';
   postButton.setAttribute('type', 'button');
-  postButton.setAttribute('data-id', '2');
+  postButton.setAttribute('data-id', `${item.feedId}_${item.id}`);
   postButton.setAttribute('data-bs-toggle', 'modal');
   postButton.setAttribute('data-bs-target', '#modal');
   postItem.append(postLink, postButton);
@@ -99,6 +107,15 @@ const renderFeeds = (feedList, articles) => {
     listOfFeeds.append(...feedList.map((item) => renderFeed(item)));
     listOfPosts.append(...articles.map((item) => renderPost(item)));
   }
+};
+
+export const modalWatcher = (state) => {
+  const watchedState = onChange(state.uiState, () => {
+    modalTitle.textContent = watchedState.currentArticle.title;
+    modalBody.innerHTML = `<p>${watchedState.currentArticle.description}</p>`;
+    modalLinkButton.setAttribute('href', watchedState.currentArticle.link);
+  });
+  return watchedState;
 };
 
 export default (state) => {

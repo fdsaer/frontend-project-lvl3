@@ -2,12 +2,14 @@ import './style.scss';
 import { setLocale, string, ValidationError } from 'yup';
 import i18next from 'i18next';
 import axios from 'axios';
-import view from './view.js';
+import view, { modalWatcher } from './view.js';
 import { baseURL, fetchInterval } from './constants.js';
 import { rssParser } from './utilities.js';
+import 'bootstrap';
 
 const queryForm = document.querySelector('.rss-form');
 const urlInput = document.getElementById('url-input');
+const mainPart = document.querySelector('main');
 
 const state = {
   queryProcess: {
@@ -17,7 +19,11 @@ const state = {
     validationState: 'valid',
     feedList: [],
     articles: [],
-    timer: '',
+  },
+  timer: '',
+  uiState: {
+    visitedArticles: [],
+    currentArticle: {},
   },
 };
 
@@ -62,6 +68,7 @@ setLocale({
 const validUrl = string().min(3).url();
 
 const watchedState = view(state);
+const watchedModalState = modalWatcher(state);
 
 urlInput.addEventListener('input', (evt) => {
   watchedState.state = 'filling';
@@ -73,10 +80,11 @@ const axiosInstance = axios.create({
 });
 
 const getFeed = (url) => axiosInstance
-  .get(`get?url=${encodeURIComponent(url)}`)
+  .get(`get?url=${encodeURIComponent(url)}&disableCache=true`)
+// get?url=https%3A%2F%2Faif.ru%2Frss%2Fhealth.php&disableCache=true
   .then((response) => {
     if (response.status === 200 && response?.data?.contents) {
-      return response.data.contents;
+      return { url, rss: response.data.contents };
     }
     throw new Error(i18next.t('can_not_fetch'));
   });
@@ -85,16 +93,18 @@ const updateFeeds = () => {
   const timer = setTimeout(() => {
     Promise
       .all(watchedState.feedList.map(({ link }) => getFeed(link)
-        .then((rss) => rssParser(
+        .then(({ url, rss }) => rssParser(
           rss,
           watchedState.feedList,
+          watchedState.articles,
+          url,
         ))))
       .then((feedObjects) => {
         const arrs = [];
         feedObjects.forEach(({ articlesList }) => {
           arrs.unshift(...articlesList);
         });
-        watchedState.articles = arrs;
+        if (arrs.length > 0) watchedState.articles.unshift(...arrs);
         updateFeeds();
       });
   }, fetchInterval);
@@ -112,10 +122,12 @@ queryForm.addEventListener('submit', (evt) => {
       watchedState.validationState = 'valid';
     })
     .then(() => getFeed(state.queryProcess.formValue))
-    .then((rss) => {
+    .then(({ url, rss }) => {
       const result = rssParser(
         rss,
-        watchedState.feedList.length > 0 ? watchedState.feedList : [],
+        watchedState.feedList,
+        watchedState.articles,
+        url,
       );
       console.log({ result });
       return result;
@@ -124,7 +136,7 @@ queryForm.addEventListener('submit', (evt) => {
       watchedState.feedList.unshift(...feedObj?.feedList);
       watchedState.articles.unshift(...feedObj?.articlesList);
       watchedState.state = 'success';
-      if (!watchedState.timer) watchedState.timer = updateFeeds();
+      if (!state.timer) state.timer = updateFeeds();
     })
     .catch((err) => {
       let errorText = '';
@@ -138,4 +150,26 @@ queryForm.addEventListener('submit', (evt) => {
       watchedState.error = errorText;
       watchedState.validationState = 'invalid';
     });
+});
+
+mainPart.addEventListener('click', (evt) => {
+  if ((evt.target.tagName === 'A' || evt.target.tagName === 'BUTTON') && evt.target.hasAttribute('data-id')) {
+    const [feedId, id] = evt.target.getAttribute('data-id').split('_');
+    const index = watchedState.articles.reduce((acc, article, ind) => {
+      const newAcc = (article.id === 1 * id && article.feedId === 1 * feedId) ? ind : acc;
+      return newAcc;
+    }, 0);
+    watchedState.articles[index].visited = true;
+  }
+});
+
+mainPart.addEventListener('click', (evt) => {
+  if ((evt.target.tagName === 'BUTTON') && evt.target.hasAttribute('data-id')) {
+    const [feedId, id] = evt.target.getAttribute('data-id').split('_');
+    const index = watchedState.articles.reduce((acc, article, ind) => {
+      const newAcc = (article.id === 1 * id && article.feedId === 1 * feedId) ? ind : acc;
+      return newAcc;
+    }, 0);
+    watchedModalState.currentArticle = { ...watchedState.articles[index] };
+  }
 });
