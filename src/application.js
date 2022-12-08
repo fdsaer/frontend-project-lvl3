@@ -124,8 +124,8 @@ export default () => {
       .then(() => getFeed(state.queryProcess.formValue, axiosInstance))
       .then(({ url, rss }) => rssParser(rss, watchedState.feedList, watchedState.articles, url))
       .then((feedObj) => {
-        watchedState.feedList.unshift(...feedObj?.feedList);
-        watchedState.articles.unshift(...feedObj?.articlesList);
+        watchedState.feedList.unshift(...feedObj.feedList);
+        watchedState.articles.unshift(...feedObj.articlesList);
         watchedState.state = 'success';
       })
       .then(() => {
