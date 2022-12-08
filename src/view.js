@@ -1,16 +1,3 @@
-import './style.scss';
-import onChange from 'on-change';
-
-const mainPart = document.querySelector('main');
-const modal = document.getElementById('modal');
-const modalTitle = modal.querySelector('.modal-title');
-const modalBody = modal.querySelector('.modal-body');
-const modalLinkButton = modal.querySelector('.modal-footer a');
-const urlInput = document.getElementById('url-input');
-const feedbackString = document.querySelector('.feedback');
-const queryForm = document.querySelector('.rss-form');
-const addButton = queryForm.querySelector('button');
-
 const renderFeed = (item) => {
   const feedItem = document.createElement('li');
   const feedHeader = document.createElement('h3');
@@ -24,7 +11,7 @@ const renderFeed = (item) => {
   return feedItem;
 };
 
-const renderPost = (item) => {
+const renderPost = (item, i18instance) => {
   const postItem = document.createElement('li');
   const postLink = document.createElement('a');
   const postButton = document.createElement('button');
@@ -47,7 +34,7 @@ const renderPost = (item) => {
   postLink.setAttribute('data-id', `${item.feedId}_${item.id}`);
   postLink.setAttribute('target', '_blank');
   postLink.setAttribute('rel', 'noopener noreferrer');
-  postButton.innerHTML = 'Просмотр';
+  postButton.innerHTML = i18instance('watching');
   postButton.setAttribute('type', 'button');
   postButton.setAttribute('data-id', `${item.feedId}_${item.id}`);
   postButton.setAttribute('data-bs-toggle', 'modal');
@@ -56,22 +43,14 @@ const renderPost = (item) => {
   return postItem;
 };
 
-const renderFeeds = (feedList, articles) => {
-  const feeds = document.querySelector('.feeds');
-  const posts = document.querySelector('.posts');
-  if (!feeds && !posts) {
-    const section = document.createElement('section');
-    const row = document.createElement('div');
-    const col1 = document.createElement('div');
-    const col2 = document.createElement('div');
+const renderFeeds = (feedList, articles, feedsEl, postsEl, i18instance) => {
+  const listOfFeeds = feedsEl.querySelector('ul');
+  const listOfPosts = postsEl.querySelector('ul');
+  if (!listOfFeeds && !listOfPosts) {
     const card = document.createElement('div');
     const cardBody = document.createElement('div');
     const cardList = document.createElement('ul');
     const cardHeader = document.createElement('h4');
-    section.classList.add('container-fluid', 'container-xxl', 'p-5');
-    row.classList.add('row');
-    col1.classList.add('col-md-10', 'col-lg-8', 'order-1', 'mx-auto', 'posts');
-    col2.classList.add('col-md-10', 'col-lg-4', 'mx-auto', 'order-0', 'order-lg-1', 'feeds');
     card.classList.add('card', 'border-0');
     cardBody.classList.add('card-body');
     cardList.classList.add('list-group', 'border-0', 'rounded-0');
@@ -79,8 +58,8 @@ const renderFeeds = (feedList, articles) => {
 
     const postsHeader = cardHeader.cloneNode(false);
     const feedsHeader = cardHeader.cloneNode(false);
-    postsHeader.innerHTML = 'Посты';
-    feedsHeader.innerHTML = 'Фиды';
+    postsHeader.innerHTML = i18instance('posts');
+    feedsHeader.innerHTML = i18instance('feeds');
 
     const postsCardBody = cardBody.cloneNode(false);
     const feedsCardBody = cardBody.cloneNode(false);
@@ -91,25 +70,22 @@ const renderFeeds = (feedList, articles) => {
     postsCardBody.appendChild(postsHeader);
     feedsCardBody.appendChild(feedsHeader);
     feedsList.append(...feedList.map((item) => renderFeed(item)));
-    postsList.append(...articles.map((item) => renderPost(item)));
+    postsList.append(...articles.map((item) => renderPost(item, i18instance)));
     feedsCard.append(feedsCardBody, feedsList);
     postsCard.append(postsCardBody, postsList);
 
-    col1.appendChild(postsCard);
-    col2.appendChild(feedsCard);
-    section.appendChild(row).append(col1, col2);
-    mainPart.append(section);
+    postsEl.appendChild(postsCard);
+    feedsEl.appendChild(feedsCard);
   } else {
-    const listOfFeeds = feeds.querySelector('ul');
-    const listOfPosts = posts.querySelector('ul');
     listOfFeeds.innerHTML = '';
     listOfPosts.innerHTML = '';
     listOfFeeds.append(...feedList.map((item) => renderFeed(item)));
-    listOfPosts.append(...articles.map((item) => renderPost(item)));
+    listOfPosts.append(...articles.map((item) => renderPost(item, i18instance)));
   }
 };
 
-export const modalWatcher = (state) => {
+export const modalWatcher = (onChange, state, elements) => {
+  const { modalBody, modalTitle, modalLinkButton } = elements;
   const watchedState = onChange(state.uiState, () => {
     modalTitle.textContent = watchedState.currentArticle.title;
     modalBody.innerHTML = `<p>${watchedState.currentArticle.description}</p>`;
@@ -118,14 +94,11 @@ export const modalWatcher = (state) => {
   return watchedState;
 };
 
-export default (state) => {
-  console.log('initialing onChange');
-  console.log({ state });
+export default (onChange, state, elements, i18instance) => {
   const watchedState = onChange(state.queryProcess, () => {
-    console.log('i am in watcher');
-    console.log({ currentState: watchedState });
+    const { form: { feedbackString }, form: { urlInput }, form: { addButton } } = elements;
+    const { content: { feeds }, content: { posts } } = elements;
     if (watchedState.validationState === 'invalid') {
-      console.log('invalid');
       urlInput.classList.add('is-invalid');
       feedbackString.classList.remove('text-success');
       feedbackString.classList.add('text-danger');
@@ -143,15 +116,13 @@ export default (state) => {
       urlInput.setAttribute('readonly', 'true');
       addButton.setAttribute('disabled', 'true');
     } else if (watchedState.state === 'success') {
-      console.log('success');
       urlInput.removeAttribute('readonly');
       addButton.removeAttribute('disabled');
       urlInput.focus();
       urlInput.value = '';
-      renderFeeds(watchedState.feedList, watchedState.articles);
-      feedbackString.textContent = 'RSS успешно загружен';
+      renderFeeds(watchedState.feedList, watchedState.articles, feeds, posts, i18instance);
+      feedbackString.textContent = i18instance('feed_loaded');
     } else if (watchedState.state === 'failed') {
-      console.log('fail');
       urlInput.removeAttribute('readonly');
       addButton.removeAttribute('disabled');
       urlInput.focus();

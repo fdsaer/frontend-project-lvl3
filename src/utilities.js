@@ -1,12 +1,31 @@
-export const getArticlesDiff = (fetchedArticles, stateArticles) => {
-  const diff = [];
-  const filteredArticles = stateArticles.filter(({ feedId }) => (
-    feedId === fetchedArticles[0].feedId));
-  fetchedArticles.forEach((article) => {
-    const articleInState = filteredArticles.find(({ link }) => link === article.link);
-    if (!articleInState) diff.unshift(article);
+import ParseError from './parseError.js';
+
+export const getFeed = (url, axiosInstance) => axiosInstance
+  .get(`get?url=${encodeURIComponent(url)}&disableCache=true`)
+  .then((response) => {
+    if (response.status === 200 && response?.data?.contents) {
+      return { url, rss: response.data.contents };
+    }
+    throw new Error('network_error');
   });
-  return diff;
+
+export const updateFeeds = (...params) => {
+  const [watchedState, fetchFeed, rssParser, axiosInstance, fetchInterval] = params;
+  Promise
+    .all(watchedState.feedList.map(({ link }) => fetchFeed(link, axiosInstance)
+      .then(({ url, rss }) => rssParser(rss, watchedState.feedList, watchedState.articles, url))))
+    .then((feedObjects) => {
+      const arrs = [];
+      feedObjects.forEach(({ articlesList }) => {
+        arrs.unshift(...articlesList);
+      });
+      if (arrs.length > 0) watchedState.articles.unshift(...arrs);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  const timer = setTimeout(() => { updateFeeds(...params); }, fetchInterval);
+  return timer;
 };
 
 const getIds = (fetchedFeeds, stateFeeds, stateArticles) => {
@@ -39,16 +58,17 @@ export const rssParser = (rss, stateFeeds, stateArticles, url) => {
     feedList: [],
     articlesList: [],
   };
-  console.log({ rss });
   const parser = new DOMParser();
   const htmlDoc = parser.parseFromString(rss, 'text/xml');
+  const errorNode = htmlDoc.querySelector('parsererror');
+  if (errorNode) {
+    throw new ParseError('Parse rss error');
+  }
   const channel = htmlDoc.querySelector('channel');
-  console.log({ channel });
   const rssTitle = channel.querySelector('title').textContent;
   const rssDescription = channel.querySelector('description').textContent;
   const rssLink = url;
   const articlesDomList = channel.querySelectorAll('item');
-  console.log({ rssTitle });
   const articlesArrayList = Array.prototype.slice.call(articlesDomList).map((item) => {
     const itemTitle = item.querySelector('title').textContent;
     const itemDescription = item.querySelector('description').textContent;
@@ -68,11 +88,5 @@ export const rssParser = (rss, stateFeeds, stateArticles, url) => {
     ? articlesArrayList
     : [];
   const feedsWithIds = getIds(feedObj, stateFeeds, stateArticles);
-  console.log(feedsWithIds);
-  return new Promise((resolve) => {
-    if (articlesArrayList.length > 4) {
-      resolve(feedsWithIds);
-    }
-    throw new Error('jffdkssdsfdfdewrewr');
-  });
+  return Promise.resolve(feedsWithIds);
 };
