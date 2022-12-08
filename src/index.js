@@ -33,22 +33,28 @@ i18next.init({
   resources: {
     ru: {
       translation: {
-        default_error: 'Ошибка заполнения поля',
-        not_a_url: 'Это точно урл?',
-        field_too_small: 'Слишком маленький (',
-        not_one_of: 'Это уже было (',
-        can_not_fetch: 'По этому урлу не содержится rss',
+        default: 'Ошибка заполнения поля',
+        url: 'Ссылка должна быть валидным URL',
+        min: 'Слишком маленький (',
+        notOneOf: 'RSS уже существует',
+        required: 'Не должно быть пустым',
+        can_not_fetch: 'Ресурс не содержит валидный RSS',
         feed_loaded: 'RSS успешно загружен',
+        network_error: 'Ошибка сети',
+        watching: 'Просмотр',
       },
     },
     en: {
       translation: {
-        default_error: 'Default field mistake',
-        not_a_url: 'hello world',
-        field_too_small: 'too small !!!',
-        not_one_of: 'Must not be one of',
+        default: 'Default field mistake',
+        url: 'hello world',
+        min: 'too small !!!',
+        notOneOf: 'Must not be one of',
+        required: 'Empty field',
         can_not_fetch: 'No rss by this url',
         feed_loaded: 'RSS successefully loaded',
+        network_error: 'Network error',
+        watching: 'Watch',
       },
     },
   },
@@ -56,16 +62,17 @@ i18next.init({
 
 setLocale({
   mixed: {
-    default: () => ({ key: 'default_error' }),
-    notOneOf: () => ({ key: 'not_one_of' }),
+    default: () => ({ key: 'default' }),
+    notOneOf: () => ({ key: 'notOneOf' }),
   },
   string: {
-    url: () => ({ key: 'not_a_url' }),
-    min: ({ min }) => ({ key: 'field_too_small', values: { min } }),
+    url: () => ({ key: 'url' }),
+    required: () => ({ key: 'required' }),
+    min: ({ min }) => ({ key: 'min', values: { min } }),
   },
 });
 
-const validUrl = string().min(3).url();
+const validUrl = string().required().url();
 
 const watchedState = view(state);
 const watchedModalState = modalWatcher(state);
@@ -81,12 +88,11 @@ const axiosInstance = axios.create({
 
 const getFeed = (url) => axiosInstance
   .get(`get?url=${encodeURIComponent(url)}&disableCache=true`)
-// get?url=https%3A%2F%2Faif.ru%2Frss%2Fhealth.php&disableCache=true
   .then((response) => {
     if (response.status === 200 && response?.data?.contents) {
       return { url, rss: response.data.contents };
     }
-    throw new Error(i18next.t('can_not_fetch'));
+    throw new Error(i18next.t('network_error'));
   });
 
 const updateFeeds = () => {
@@ -141,9 +147,11 @@ queryForm.addEventListener('submit', (evt) => {
     .catch((err) => {
       let errorText = '';
       if (err instanceof ValidationError) {
-        const [errorMessage] = err.errors.map((item) => i18next.t(item.key));
-        errorText = errorMessage;
+        errorText = i18next.t(err.type);
+      } else if (err.isAxiosError) {
+        errorText = i18next.t('network_error');
       } else {
+        console.log({ err });
         errorText = err.message;
       }
       watchedState.state = 'failed';
