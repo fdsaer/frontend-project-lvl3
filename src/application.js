@@ -5,7 +5,9 @@ import onChange from 'on-change';
 import ParseError from './parseError.js';
 import view, { modalWatcher } from './view.js';
 import { baseURL, fetchInterval } from './constants.js';
-import { rssParser, getFeed, updateFeeds } from './utilities.js';
+import {
+  parseRss, getFeed, updateFeeds, getNewFeedsWithIds,
+} from './utilities.js';
 
 export default () => {
   const elements = () => {
@@ -122,10 +124,12 @@ export default () => {
         watchedState.validationState = 'valid';
       })
       .then(() => getFeed(state.queryProcess.formValue, axiosInstance))
-      .then(({ url, rss }) => rssParser(rss, watchedState.feedList, watchedState.articles, url))
-      .then((feedObj) => {
-        watchedState.feedList.unshift(...feedObj.feedList);
-        watchedState.articles.unshift(...feedObj.articlesList);
+      .then(({ url, rss }) => parseRss(rss, url))
+      .then((fetchedFeeds) => (
+        getNewFeedsWithIds(fetchedFeeds, watchedState.feedList, watchedState.articles)))
+      .then(({ feedList, articlesList }) => {
+        watchedState.feedList.unshift(...feedList);
+        watchedState.articles.unshift(...articlesList);
         watchedState.state = 'success';
       })
       .then(() => {
@@ -133,7 +137,7 @@ export default () => {
           state.timer = updateFeeds(
             watchedState,
             getFeed,
-            rssParser,
+            parseRss,
             axiosInstance,
             fetchInterval,
           );

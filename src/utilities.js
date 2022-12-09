@@ -9,11 +9,69 @@ export const getFeed = (url, axiosInstance) => axiosInstance
     throw new Error('network_error');
   });
 
+const getFeedIndexInState = (fetchedFeed, stateFeeds) => (
+  stateFeeds.map(({ link }) => link).indexOf(fetchedFeed.link));
+
+const getFeedNextId = (fetchedFeed, stateFeeds) => {
+  const indexOfFeedInState = getFeedIndexInState(fetchedFeed, stateFeeds);
+  if (indexOfFeedInState !== -1) {
+    return stateFeeds[indexOfFeedInState].id;
+  }
+  return stateFeeds.length > 0 ? Math.max(...stateFeeds.map(({ id }) => id)) + 1 : 0;
+};
+
+const getPostNextId = (fetchedFeed, stateFeeds, statePosts) => {
+  const indexOfFeedInState = getFeedIndexInState(fetchedFeed, stateFeeds);
+  if (indexOfFeedInState !== -1) {
+    const filteredPosts = statePosts.filter(({ feedId }) => (
+      feedId === stateFeeds[indexOfFeedInState].id));
+    return filteredPosts.length;
+  }
+  return 0;
+};
+
+const getNewPosts = (fetchedFeed, fetchedPosts, stateFeeds, statePosts) => {
+  const indexOfFeedInState = getFeedIndexInState(fetchedFeed, stateFeeds);
+  if (indexOfFeedInState !== -1) {
+    const newPosts = [];
+    const filteredPosts = statePosts.filter(({ feedId }) => (
+      feedId === stateFeeds[indexOfFeedInState].id));
+    fetchedPosts.forEach((post) => {
+      const articleInState = filteredPosts
+        .map(({ link }) => link)
+        .includes(post.link);
+      if (articleInState) newPosts.push(post);
+    });
+    return newPosts;
+  }
+  return fetchedPosts;
+};
+
+export const getNewFeedsWithIds = (fetchedFeeds, stateFeeds, statePosts) => {
+  const feedsClone = fetchedFeeds.feedList.slice();
+  const feedId = getFeedNextId(fetchedFeeds.feedList[0], stateFeeds);
+  const feedsWithIds = feedsClone.map((feed) => ({ ...feed, id: feedId }));
+  const newPosts = getNewPosts(
+    fetchedFeeds.feedList[0],
+    fetchedFeeds.articlesList,
+    stateFeeds,
+    statePosts,
+  );
+  const postNextId = getPostNextId(fetchedFeeds.feedList[0], stateFeeds, statePosts);
+  const newPostsWithIds = newPosts.length > 0 ? newPosts
+    .map((post, id) => ({ ...post, feedId, id: postNextId + id })) : [];
+  return Promise
+    .resolve({ feedList: feedsWithIds, articlesList: newPostsWithIds });
+};
+
 export const updateFeeds = (...params) => {
-  const [watchedState, fetchFeed, rssParser, axiosInstance, fetchInterval] = params;
+  const [watchedState, fetchFeed, parseRss, axiosInstance, fetchInterval] = params;
   Promise
-    .all(watchedState.feedList.map(({ link }) => fetchFeed(link, axiosInstance)
-      .then(({ url, rss }) => rssParser(rss, watchedState.feedList, watchedState.articles, url))))
+    .all(watchedState.feedList
+      .map(({ link }) => fetchFeed(link, axiosInstance)
+        .then(({ url, rss }) => parseRss(rss, url))
+        .then((fetchedFeeds) => (
+          getNewFeedsWithIds(fetchedFeeds, watchedState.feedList, watchedState.articles)))))
     .then((feedObjects) => {
       const arrs = [];
       feedObjects.forEach(({ articlesList }) => {
@@ -28,32 +86,18 @@ export const updateFeeds = (...params) => {
   return timer;
 };
 
-const getIds = (fetchedFeeds, stateFeeds, stateArticles) => {
-  const feedsClone = fetchedFeeds.feedList.slice();
-  const articlesClone = fetchedFeeds.articlesList.slice();
-  const indexOfFeedInState = stateFeeds.map(({ link }) => link).indexOf(feedsClone[0].link);
-  if (indexOfFeedInState !== -1) {
-    const newArticles = [];
-    const feedId = stateFeeds[indexOfFeedInState]?.id;
-    const feedsWithIds = feedsClone.map((feed) => ({ ...feed, id: feedId }));
-    const filteredArticles = stateArticles.filter(({ feedId: stateArticleFeedId }) => (
-      feedId === stateArticleFeedId));
-    articlesClone.forEach((article) => {
-      const articleInState = filteredArticles.find(({ link }) => link === article.link);
-      if (!articleInState) newArticles.unshift(article);
-    });
-    const articlesWithIds = newArticles
-      .map((article, id) => ({ ...article, feedId, id: id + filteredArticles.length }));
-    return { feedList: feedsWithIds, articlesList: articlesWithIds };
-  }
-  const feedId = stateFeeds.length > 0 ? Math.max(...stateFeeds.map(({ id }) => id)) + 1 : 0;
-  const feedsWithIds = feedsClone.map((feed) => ({ ...feed, id: feedId }));
-  const articlesWithIds = articlesClone
-    .map((article, id) => ({ ...article, feedId, id }));
-  return { feedList: feedsWithIds, articlesList: articlesWithIds };
+const parseArticle = (rssItem) => {
+  const itemTitle = rssItem.querySelector('title').textContent;
+  const itemDescription = rssItem.querySelector('description').textContent;
+  const itemLink = rssItem.querySelector('link').textContent;
+  return {
+    title: itemTitle,
+    description: itemDescription,
+    link: itemLink,
+  };
 };
 
-export const rssParser = (rss, stateFeeds, stateArticles, url) => {
+export const parseRss = (rss, url) => {
   const feedObj = {
     feedList: [],
     articlesList: [],
@@ -61,32 +105,17 @@ export const rssParser = (rss, stateFeeds, stateArticles, url) => {
   const parser = new DOMParser();
   const htmlDoc = parser.parseFromString(rss, 'text/xml');
   const errorNode = htmlDoc.querySelector('parsererror');
-  if (errorNode) {
-    throw new ParseError('Parse rss error');
-  }
+  if (errorNode) throw new ParseError('Parse rss error');
   const channel = htmlDoc.querySelector('channel');
-  const rssTitle = channel.querySelector('title').textContent;
-  const rssDescription = channel.querySelector('description').textContent;
-  const rssLink = url;
   const articlesDomList = channel.querySelectorAll('item');
-  const articlesArrayList = Array.prototype.slice.call(articlesDomList).map((item) => {
-    const itemTitle = item.querySelector('title').textContent;
-    const itemDescription = item.querySelector('description').textContent;
-    const itemLink = item.querySelector('link').textContent;
-    return {
-      title: itemTitle,
-      description: itemDescription,
-      link: itemLink,
-    };
-  });
+  const articlesArrayList = Array.prototype.slice.call(articlesDomList).map(parseArticle);
   feedObj.feedList.push({
-    title: rssTitle,
-    description: rssDescription,
-    link: rssLink,
+    title: channel.querySelector('title').textContent,
+    description: channel.querySelector('description').textContent,
+    link: url,
   });
   feedObj.articlesList = Array.isArray(articlesArrayList) && articlesArrayList.length > 0
     ? articlesArrayList
     : [];
-  const feedsWithIds = getIds(feedObj, stateFeeds, stateArticles);
-  return Promise.resolve(feedsWithIds);
+  return Promise.resolve(feedObj);
 };
