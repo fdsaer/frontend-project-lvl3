@@ -40,7 +40,7 @@ const getNewPosts = (fetchedFeed, fetchedPosts, stateFeeds, statePosts) => {
       const articleInState = filteredPosts
         .map(({ link }) => link)
         .includes(post.link);
-      if (articleInState) newPosts.push(post);
+      if (!articleInState) newPosts.push(post);
     });
     return newPosts;
   }
