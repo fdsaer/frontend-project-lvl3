@@ -11,13 +11,13 @@ const renderFeed = (item) => {
   return feedItem;
 };
 
-const renderPost = (item, i18instance) => {
+const renderPost = (item, i18instance, visitedArticles) => {
   const postItem = document.createElement('li');
   const postLink = document.createElement('a');
   const postButton = document.createElement('button');
   postItem.classList.add('list-group-item', 'd-flex', 'justify-content-between');
   postItem.classList.add('align-items-start', 'border-0', 'border-end-0');
-  if (item?.visited) {
+  if (visitedArticles.includes(`${item.feedId}_${item.id}`)) {
     postLink.classList.add('fw-normal', 'link-secondary');
   } else {
     postLink.classList.add('fw-bold');
@@ -51,14 +51,22 @@ const createTemplates = () => {
   };
 };
 
-const createPostsCard = (card, cardBody, cardList, cardHeader, i18instance, articles) => {
+const createPostsCard = (
+  card,
+  cardBody,
+  cardList,
+  cardHeader,
+  i18instance,
+  articles,
+  visitedArticles,
+) => {
   const postsHeader = cardHeader.cloneNode(false);
   postsHeader.innerHTML = i18instance('posts');
   const postsCardBody = cardBody.cloneNode(false);
   const postsCard = card.cloneNode(false);
   const postsList = cardList.cloneNode(false);
   postsCardBody.appendChild(postsHeader);
-  postsList.append(...articles.map((item) => renderPost(item, i18instance)));
+  postsList.append(...articles.map((item) => renderPost(item, i18instance, visitedArticles)));
   postsCard.append(postsCardBody, postsList);
   return postsCard;
 };
@@ -75,14 +83,22 @@ const createFeedsCard = (card, cardBody, cardList, cardHeader, i18instance, feed
   return feedsCard;
 };
 
-const renderContent = (feedList, articles, feedsEl, postsEl, i18instance) => {
+const renderContent = (feedList, articles, feedsEl, postsEl, i18instance, visitedArticles) => {
   const listOfFeeds = feedsEl.querySelector('ul');
   const listOfPosts = postsEl.querySelector('ul');
   if (!listOfFeeds && !listOfPosts) {
     const {
       card, cardBody, cardList, cardHeader,
     } = createTemplates();
-    const postsCard = createPostsCard(card, cardBody, cardList, cardHeader, i18instance, articles);
+    const postsCard = createPostsCard(
+      card,
+      cardBody,
+      cardList,
+      cardHeader,
+      i18instance,
+      articles,
+      visitedArticles,
+    );
     const feedsCard = createFeedsCard(card, cardBody, cardList, cardHeader, i18instance, feedList);
 
     postsEl.appendChild(postsCard);
@@ -91,7 +107,7 @@ const renderContent = (feedList, articles, feedsEl, postsEl, i18instance) => {
     listOfFeeds.innerHTML = '';
     listOfPosts.innerHTML = '';
     listOfFeeds.append(...feedList.map((item) => renderFeed(item)));
-    listOfPosts.append(...articles.map((item) => renderPost(item, i18instance)));
+    listOfPosts.append(...articles.map((item) => renderPost(item, i18instance, visitedArticles)));
   }
 };
 
@@ -112,7 +128,6 @@ const switchValidationStyles = (watchedState, elements) => {
 
 const switchFetchStateStyles = (watchedState, elements, i18instance) => {
   const { form: { feedbackString }, form: { urlInput }, form: { addButton } } = elements;
-  const { content: { feeds }, content: { posts } } = elements;
   if (watchedState.state === 'filling') {
     urlInput.classList.remove('is-invalid');
     feedbackString.textContent = '';
@@ -124,7 +139,6 @@ const switchFetchStateStyles = (watchedState, elements, i18instance) => {
     addButton.removeAttribute('disabled');
     urlInput.focus();
     urlInput.value = '';
-    renderContent(watchedState.feedList, watchedState.articles, feeds, posts, i18instance);
     feedbackString.textContent = i18instance('feed_loaded');
   } else if (watchedState.state === 'failed') {
     urlInput.removeAttribute('readonly');
@@ -135,18 +149,50 @@ const switchFetchStateStyles = (watchedState, elements, i18instance) => {
 
 export const modalWatcher = (onChange, state, elements) => {
   const { modalBody, modalTitle, modalLinkButton } = elements;
-  const watchedState = onChange(state.uiState, () => {
-    modalTitle.textContent = watchedState.currentArticle.title;
-    modalBody.innerHTML = `<p>${watchedState.currentArticle.description}</p>`;
-    modalLinkButton.setAttribute('href', watchedState.currentArticle.link);
+  const watchedState = onChange(state.uiState.currentArticle, () => {
+    const [feedId, id] = watchedState.id.split('_');
+    const index = state.queryProcess.articles.reduce((acc, article, ind) => {
+      const newAcc = (article.id === 1 * id && article.feedId === 1 * feedId) ? ind : acc;
+      return newAcc;
+    }, 0);
+    const currentArticle = state.queryProcess.articles[index];
+    modalTitle.textContent = currentArticle.title;
+    modalBody.innerHTML = `<p>${currentArticle.description}</p>`;
+    modalLinkButton.setAttribute('href', currentArticle.link);
   });
   return watchedState;
 };
 
-export default (onChange, state, elements, i18instance) => {
+export const uiWatcher = (onChange, state, elements, i18instance) => {
+  const { content: { feeds }, content: { posts } } = elements;
+  const watchedState = onChange(state.uiState.visitedArticles, () => {
+    renderContent(
+      state.queryProcess.feedList,
+      state.queryProcess.articles,
+      feeds,
+      posts,
+      i18instance,
+      state.uiState.visitedArticles,
+    );
+  });
+  return watchedState;
+};
+
+export const queryWatcher = (onChange, state, elements, i18instance) => {
+  const { content: { feeds }, content: { posts } } = elements;
   const watchedState = onChange(state.queryProcess, () => {
     switchValidationStyles(watchedState, elements);
     switchFetchStateStyles(watchedState, elements, i18instance);
+    if (watchedState.state === 'success') {
+      renderContent(
+        watchedState.feedList,
+        watchedState.articles,
+        feeds,
+        posts,
+        i18instance,
+        state.uiState.visitedArticles,
+      );
+    }
   });
   return watchedState;
 };

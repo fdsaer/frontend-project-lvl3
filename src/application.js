@@ -3,14 +3,14 @@ import i18next from 'i18next';
 import axios from 'axios';
 import onChange from 'on-change';
 import ParseError from './parseError.js';
-import view, { modalWatcher } from './view.js';
+import { modalWatcher, uiWatcher, queryWatcher } from './view.js';
 import { baseURL, fetchInterval } from './constants.js';
 import {
   parseRss, getFeed, updateFeeds, getNewFeedsWithIds,
 } from './utilities.js';
 
 export default () => {
-  const elements = () => {
+  const getDomElements = () => {
     const mainPart = document.querySelector('main');
     const queryForm = mainPart.querySelector('.rss-form');
     const modal = document.getElementById('modal');
@@ -34,6 +34,11 @@ export default () => {
       },
     };
   };
+
+  const domElements = getDomElements();
+  const { content: { posts: postsDomEl } } = domElements;
+  const { form: { urlInput: urlInputDomEl, queryForm: formDomEl } } = domElements;
+  const { modal: modalDomEl } = domElements;
 
   const state = {
     queryProcess: {
@@ -102,18 +107,19 @@ export default () => {
   });
 
   const validUrl = string().required().url();
-  const watchedState = view(onChange, state, elements(), i18instance.t);
-  const watchedModalState = modalWatcher(onChange, state, elements().modal);
+  const watchedState = queryWatcher(onChange, state, domElements, i18instance.t);
+  const watchedModalState = modalWatcher(onChange, state, modalDomEl);
+  const watchedUiState = uiWatcher(onChange, state, domElements, i18instance.t);
   const axiosInstance = axios.create({
     baseURL,
   });
 
-  elements().form.urlInput.addEventListener('input', (evt) => {
+  urlInputDomEl.addEventListener('input', (evt) => {
     watchedState.state = 'filling';
     watchedState.formValue = evt.target.value;
   });
 
-  elements().form.queryForm.addEventListener('submit', (evt) => {
+  formDomEl.addEventListener('submit', (evt) => {
     evt.preventDefault();
     watchedState.state = 'processing';
     validUrl
@@ -161,25 +167,13 @@ export default () => {
       });
   });
 
-  elements().content.posts.addEventListener('click', (evt) => {
+  postsDomEl.addEventListener('click', (evt) => {
     if ((evt.target.tagName === 'A' || evt.target.tagName === 'BUTTON') && evt.target.hasAttribute('data-id')) {
-      const [feedId, id] = evt.target.getAttribute('data-id').split('_');
-      const index = watchedState.articles.reduce((acc, article, ind) => {
-        const newAcc = (article.id === 1 * id && article.feedId === 1 * feedId) ? ind : acc;
-        return newAcc;
-      }, 0);
-      watchedState.articles[index].visited = true;
-    }
-  });
-
-  elements().content.posts.addEventListener('click', (evt) => {
-    if ((evt.target.tagName === 'BUTTON') && evt.target.hasAttribute('data-id')) {
-      const [feedId, id] = evt.target.getAttribute('data-id').split('_');
-      const index = watchedState.articles.reduce((acc, article, ind) => {
-        const newAcc = (article.id === 1 * id && article.feedId === 1 * feedId) ? ind : acc;
-        return newAcc;
-      }, 0);
-      watchedModalState.currentArticle = { ...watchedState.articles[index] };
+      const currentId = evt.target.getAttribute('data-id');
+      watchedUiState.push(currentId);
+      if (evt.target.tagName === 'BUTTON') {
+        watchedModalState.id = currentId;
+      }
     }
   });
 };
